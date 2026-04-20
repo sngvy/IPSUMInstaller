@@ -71,4 +71,24 @@ fi
 C_JOB="15 3 * * * $S >> /var/log/blocklist_update.log 2>&1"
 (crontab -l 2>/dev/null | grep -v "$S" ; echo "$C_JOB") | crontab -
 
+read -p "Создать службу systemd для обновления при старте системы? [y/N]: " SYSTEMD_CHOICE
+if [[ "$SYSTEMD_CHOICE" =~ ^[Yy]$ ]]; then
+    cat << EOF > /etc/systemd/system/ipsum-update.service
+[Unit]
+Description=Update IPSUM Protection List on Boot
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=$S
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    systemctl daemon-reload
+    systemctl enable ipsum-update.service
+    echo -e "${B_YELLOW}Служба systemd создана и включена.${NC}"
+fi
+
 echo -e "${B_GREEN}IPSUM Protection успешно настроен через $MODE!${NC}"
