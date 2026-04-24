@@ -34,8 +34,8 @@ case $FW_CHOICE in
             apt-get purge -y iptables-persistent -qq
         fi
         
-        # Устанавливаем только Curl
-        apt-get install -y curl -qq
+        # Устанавливаем общие зависимости
+        apt-get install -y ipset -qq
         ;;
     2) 
         MODE="iptables"
