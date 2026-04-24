@@ -33,9 +33,6 @@ case $FW_CHOICE in
             echo -e "${B_YELLOW}Удаление конфликтующего iptables-persistent...${NC}"
             apt-get purge -y iptables-persistent -qq
         fi
-        
-        # Устанавливаем общие зависимости
-        apt-get install -y ipset -qq
         ;;
     2) 
         MODE="iptables"
@@ -51,6 +48,9 @@ case $FW_CHOICE in
         ;;
     *) echo "Неверный выбор. Выход."; exit 1 ;;
 esac
+
+# Устанавливаем общие зависимости
+apt-get install -y ipset -qq
 
 S="/usr/local/bin/update-blocklist.sh"
 cat << 'EOF' > "$S"
