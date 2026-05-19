@@ -42,6 +42,7 @@ case $FW_CHOICE in
         export DEBIAN_FRONTEND=noninteractive
 
         # Предустанавливаем ответы "Yes" (правда) для iptables-persistent
+        mkdir -p /etc/iptables
         echo "iptables-persistent iptables-persistent/autosave_v4 boolean true" | debconf-set-selections
         echo "iptables-persistent iptables-persistent/autosave_v6 boolean true" | debconf-set-selections
         apt-get update -qq && apt-get install -y curl iptables iptables-persistent -qq
