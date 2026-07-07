@@ -58,20 +58,41 @@ cat << 'EOF' > "$S"
 #!/bin/bash
 N="bad_ips"
 U="https://raw.githubusercontent.com/stamparm/ipsum/refs/heads/master/levels/1.txt"
+MODE="__MODE_PLACEHOLDER__"
 ipset create -! "$N" hash:net maxelem 1000000
 T1=$(mktemp)
 T2=$(mktemp)
-if curl -sSL "$U" | grep -v "#" | awk '{print $1}' > "$T1"; then
+if curl -sSL "$U" | grep -v "#" | awk '{print $1}' > "$T1" && [ -s "$T1" ]; then
     echo "create ${N}_new hash:net maxelem 1000000 -!" > "$T2"
     sed "s/^/add ${N}_new /" "$T1" >> "$T2"
     ipset restore < "$T2"
     ipset swap "$N" "${N}_new"
     ipset destroy "${N}_new"
     echo "$(date '+%Y-%m-%d %H:%M:%S') [SUCCESS] IPSUM list updated"
+else
+    echo "$(date '+%Y-%m-%d %H:%M:%S') [ERROR] Failed to fetch IPSUM list, keeping existing set"
 fi
 rm -f "$T1" "$T2"
+
+if [ "$MODE" = "iptables" ]; then
+    RULE_COUNT=$(iptables -t raw -S PREROUTING | grep -c "match-set ${N} src")
+    if [ "$RULE_COUNT" -gt 1 ]; then
+        echo "$(date '+%Y-%m-%d %H:%M:%S') [WARN] Найдено $RULE_COUNT дублей правила, чищу..."
+        while iptables -t raw -C PREROUTING -m set --match-set "$N" src -j DROP 2>/dev/null; do
+            iptables -t raw -D PREROUTING -m set --match-set "$N" src -j DROP
+        done
+        iptables -t raw -I PREROUTING -m set --match-set "$N" src -j DROP
+        iptables-save > /etc/iptables/rules.v4
+        echo "$(date '+%Y-%m-%d %H:%M:%S') [SUCCESS] Правило пересоздано, дубли устранены"
+    elif [ "$RULE_COUNT" -eq 0 ]; then
+        echo "$(date '+%Y-%m-%d %H:%M:%S') [WARN] Правило отсутствует, создаю"
+        iptables -t raw -I PREROUTING -m set --match-set "$N" src -j DROP
+        iptables-save > /etc/iptables/rules.v4
+    fi
+fi
 EOF
 
+sed -i "s/__MODE_PLACEHOLDER__/$MODE/" "$S"
 chmod +x "$S"
 $S
 
@@ -80,9 +101,6 @@ if [ "$MODE" = "ufw" ]; then
         sed -i "1i # IPSUM-Blocklist\n*raw\n:PREROUTING ACCEPT [0:0]\n-A PREROUTING -m set --match-set bad_ips src -j DROP\nCOMMIT\n" /etc/ufw/before.rules
         ufw reload
     fi
-else
-    iptables -t raw -I PREROUTING -m set --match-set bad_ips src -j DROP 2>/dev/null || iptables -t raw -I PREROUTING -m set --match-set bad_ips src -j DROP
-    iptables-save > /etc/iptables/rules.v4
 fi
 
 C_JOB="15 3 * * * $S >> /var/log/blocklist_update.log 2>&1"
